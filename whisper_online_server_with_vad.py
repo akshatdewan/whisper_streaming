@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from whisper_online import *
-
+from socket_stream import SocketStream
 import sys
 import argparse
 import os
@@ -123,32 +123,14 @@ import soundfile
 # wraps socket and ASR object, and serves one client connection. 
 # next client should be served by a new instance of this object
 class ServerProcessor:
-
-    def __init__(self, c, online_asr_proc, min_chunk):
-        self.connection = c
+    #AD
+    def __init__(self, ss, online_asr_proc, min_chunk):
+        self.socket_stream = ss 
         self.online_asr_proc = online_asr_proc
         self.min_chunk = min_chunk
 
         self.last_end = None
     
-    def receive_audio_chunk(self):
-        # receive all audio that is available by this time
-        # blocks operation if less than self.min_chunk seconds is available
-        # unblocks if connection is closed or a chunk is available
-        out = []
-        while sum(len(x) for x in out) < self.min_chunk*SAMPLING_RATE:
-            raw_bytes = self.connection.non_blocking_receive_audio()
-            #print(raw_bytes[:10],file=logfile)
-            #print(len(raw_bytes), file=logfile)
-            if not raw_bytes:
-                break
-            sf = soundfile.SoundFile(io.BytesIO(raw_bytes), channels=1,endian="LITTLE",samplerate=SAMPLING_RATE, subtype="PCM_16",format="RAW")
-            audio, _ = librosa.load(sf,sr=SAMPLING_RATE)
-            out.append(audio)
-        if not out:
-            return None
-        return np.concatenate(out)
-
     def format_output_transcript(self,o):
         # output format in stdout is like:
         # 0 1720 Takhle to je
@@ -170,7 +152,7 @@ class ServerProcessor:
             print("%1.0f %1.0f %s" % (beg,end,o[2]),flush=True,file=sys.stdout)
             return "%1.0f %1.0f %s" % (beg,end,o[2])
         else:
-            #print(o,file=sys.stdout,flush=True)
+            print(o,file=sys.stdout,flush=True)
             return None
 
     def send_result(self, o):
@@ -183,28 +165,54 @@ class ServerProcessor:
     def process(self):
         # handle one client connection
         self.online_asr_proc.init()
-        while True:
-            # receive all audio that is available by this time
-            # blocks operation if less than self.min_chunk seconds is available
-            # unblocks if connection is closed or a chunk is available
-            a = self.receive_audio_chunk()
-            if a is None:
-                print("break here",file=logfile)
-                break
-            self.online_asr_proc.insert_audio_chunk(a)
-            #o = online.process_iter()
-            o = self.online_asr_proc.process_iter()
-            try:
-                self.send_result(o)
-            except BrokenPipeError:
-                print("broken pipe -- connection closed?",file=logfile)
-                break
+        min_sample_length =  self.min_chunk * SAMPLING_RATE
+        online = self.online_asr_proc
+        use_vad_result = True
+        vad = VoiceActivityController(use_vad_result = use_vad_result)
 
-#        o = online.finish()  # this should be working
-#        self.send_result(o)
-
-
-
+        complete_text = ''
+        final_processing_pending = False
+        out = []
+        out_len = 0
+        for iter in vad.detect_user_speech(self.socket_stream):
+            raw_bytes=  iter[0]
+            is_final =  iter[1]
+        
+            if  raw_bytes:
+                sf = soundfile.SoundFile(io.BytesIO(raw_bytes), channels=1,endian="LITTLE",samplerate=SAMPLING_RATE, subtype="PCM_16",format="RAW")
+                audio, _ = librosa.load(sf,sr=SAMPLING_RATE)
+                out.append(audio)
+                out_len += len(audio)
+        
+            if (is_final or out_len >= min_sample_length) and out_len>0:
+                a = np.concatenate(out)
+                online.insert_audio_chunk(a)    
+                
+            if out_len > min_sample_length:
+                o = online.process_iter()
+                #print('-----'*10)
+                #complete_text = complete_text + o[2]
+                if len(o[2]) > 0:
+                    sys.stdout.write(" {}".format(o[2].strip()))
+                    sys.stdout.flush()
+                #print('PARTIAL - '+ complete_text) # do something with current partial output
+                #print('-----'*10)     
+                out = []
+                out_len = 0   
+        
+            if is_final:
+                o = online.finish()
+                online.init()   
+                # final_processing_pending = False         
+                #print('-----'*10)
+                complete_text = complete_text + o[2]
+                if not o[2] == " ":
+                    sys.stdout.write(" {}".format(o[2].strip()))
+                    sys.stdout.flush()
+                #print('FINAL - '+ complete_text) # do something with current partial output
+                #print('-----'*10)   
+                out = []
+            
 
 # Start logging.
 level = logging.INFO
@@ -220,8 +228,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     while True:
         conn, addr = s.accept()
         logging.info('INFO: Connected to client on {}'.format(addr))
-        connection = Connection(conn)
-        proc = ServerProcessor(connection, online, min_chunk)
+        #connection = Connection(conn)
+        socket_stream = SocketStream(conn)
+        #proc = ServerProcessor(connection, online, min_chunk)
+        proc = ServerProcessor(socket_stream, online, min_chunk)
         proc.process()
         conn.close()
         logging.info('INFO: Connection to client closed')

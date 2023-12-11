@@ -28,7 +28,6 @@ class ASRBase:
 
     def __init__(self, lan, modelsize=None, cache_dir=None, model_dir=None, logfile=sys.stderr):
         self.logfile = logfile
-
         self.transcribe_kargs = {}
         self.original_language = lan 
 
@@ -93,7 +92,6 @@ class FasterWhisperASR(ASRBase):
     """
 
     sep = ""
-
     def load_model(self, modelsize=None, cache_dir=None, model_dir=None):
         from faster_whisper import WhisperModel
         if model_dir is not None:
@@ -106,7 +104,8 @@ class FasterWhisperASR(ASRBase):
 
 
         # this worked fast and reliably on NVIDIA L40
-        model = WhisperModel(model_size_or_path, device="cuda", compute_type="float16", download_root=cache_dir)
+        #model = WhisperModel(model_size_or_path, device="cuda", compute_type="float16", download_root=cache_dir)
+        model = WhisperModel(model_size_or_path, device="cuda", compute_type="int8", download_root=cache_dir)
 
         # or run on GPU with INT8
         # tested: the transcripts were different, probably worse than with FP16, and it was slightly (appx 20%) slower
@@ -476,11 +475,12 @@ if __name__ == "__main__":
     parser.add_argument('--offline', action="store_true", default=False, help='Offline mode.')
     parser.add_argument('--comp_unaware', action="store_true", default=False, help='Computationally unaware simulation.')
     parser.add_argument('--vad', action="store_true", default=False, help='Use VAD = voice activity detection, with the default parameters.')
+    parser.add_argument('--logfile', type=argparse.FileType('w',encoding='utf-8',errors='strict'), default=sys.stderr, help='Log file')
     args = parser.parse_args()
 
     # reset to store stderr to different file stream, e.g. open(os.devnull,"w")
-    logfile = sys.stderr
-
+    #logfile = sys.stderr
+    logfile=args.logfile
     if args.offline and args.comp_unaware:
         print("No or one option from --offline and --comp_unaware are available, not both. Exiting.",file=logfile)
         sys.exit(1)

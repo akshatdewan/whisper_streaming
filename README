@@ -1,0 +1,9 @@
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/targets/x86_64-linux/lib/
+ ./whisper_online_server.py --logfile=server_log.txt
+ gst-launch-1.0  alsasrc  !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=127.0.0.1 port=43007  blocksize=3200
+ gst-launch-1.0  alsasrc  !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=127.0.0.1 port=43007  blocksize=3200
+ gst-launch-1.0  filesrc location=/data/s2t/test_audio/IPDAY_21_2021-04-13_AM_1_en.mp4  !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=127.0.0.1 port=43007  blocksize=3200
+
+
+#https://github.com/ufal/whisper_streaming/issues/39
+VAD from https://github.com/rodrigoGA/whisper_streaming
