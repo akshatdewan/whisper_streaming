@@ -7,3 +7,6 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/targets/x86_64-linux/lib
 
 #https://github.com/ufal/whisper_streaming/issues/39
 VAD from https://github.com/rodrigoGA/whisper_streaming
+# Specify the model dir and lang
+./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.5 --model_dir=/data/s2t/whisper/models/small --model small --language xx
+

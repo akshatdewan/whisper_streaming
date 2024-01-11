@@ -426,7 +426,8 @@ WHISPER_LANG_CODES = "af,am,ar,as,az,ba,be,bg,bn,bo,br,bs,ca,cs,cy,da,de,el,en,e
 
 def create_tokenizer(lan):
     """returns an object that has split function that works like the one of MosesTokenizer"""
-
+    if lan == None:
+        lan = "en"
     assert lan in WHISPER_LANG_CODES, "language must be Whisper's supported lang code: " + " ".join(WHISPER_LANG_CODES)
 
     if lan == "uk":

@@ -48,13 +48,18 @@ else:
 #    from whisper_timestamped_model import WhisperTimestampedASR
     asr_cls = WhisperTimestampedASR
 
-asr = asr_cls(modelsize=size, lan=language, cache_dir=args.model_cache_dir, model_dir=args.model_dir, logfile=args.logfile)
+if language == 'xx':
+    asr_language = None
+else:
+    asr_language = language
+
+asr = asr_cls(modelsize=size, lan=asr_language, cache_dir=args.model_cache_dir, model_dir=args.model_dir, logfile=args.logfile)
 
 if args.task == "translate":
     asr.set_translate_task()
     tgt_language = "en"
 else:
-    tgt_language = language
+    tgt_language = asr_language
 
 e = time.time()
 print(f"done. It took {round(e-t,2)} seconds.",file=sys.stdout)
