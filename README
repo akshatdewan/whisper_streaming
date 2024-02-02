@@ -4,9 +4,25 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/targets/x86_64-linux/lib
  gst-launch-1.0  alsasrc  !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=127.0.0.1 port=43007  blocksize=3200
  gst-launch-1.0  filesrc location=/data/s2t/test_audio/IPDAY_21_2021-04-13_AM_1_en.mp4  !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=127.0.0.1 port=43007  blocksize=3200
 
+# if needed to send HTTP requests:
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.pem
 
 #https://github.com/ufal/whisper_streaming/issues/39
 VAD from https://github.com/rodrigoGA/whisper_streaming
 # Specify the model dir and lang
 ./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.5 --model_dir=/data/s2t/whisper/models/small --model small --language xx
+
+
+# for azsrv2
+
+docker run --name live_cap --net host -u 0:0 -d -it --rm --gpus all -v /data/s2t/:/data/s2t -v /datatraining/s2t:/datatraining/s2t --device /dev/snd:/dev/snd  registry.wipo.int/atac/s2t/streaming_whisper:v1.2 bash
+docekr exec -it live_cap bash
+cd /data/s2t/speech_tools/whisper_streaming
+/whisper_streaming/venv/bin/python ./whisper_online_server.py --model_dir=/data/s2t/whisper/models/small --model small --lang en --logfile log.txt
+#Be careful when setting the device param in the command below. aplay -l gives a lot of information. There are many audio cards that are shown by aplay but we are concerned with USB cards only.
+#if need be
+pulseaudio --start
+gst-launch-1.0  alsasrc device=hw:0,0 !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=teslaazsrv2.wipo.int port=43007 blocksize=320000
+gst-launch-1.0  alsasrc device=hw:2,0 !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=teslaazsrv2.wipo.int port=43007 blocksize=320000
+
 
