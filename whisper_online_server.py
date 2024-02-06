@@ -25,6 +25,7 @@ parser.add_argument('--task', type=str, default='transcribe', choices=["transcri
 parser.add_argument('--backend', type=str, default="faster-whisper", choices=["faster-whisper", "whisper_timestamped"],help='Load only this backend for Whisper processing.')
 parser.add_argument('--vad', action="store_true", default=False, help='Use VAD = voice activity detection, with the default parameters.')
 parser.add_argument('--logfile', type=argparse.FileType('w',encoding='utf-8',errors='strict'), default=sys.stderr, help='Log file')
+add_shared_args(parser)
 args = parser.parse_args()
 
 
@@ -71,6 +72,12 @@ if args.vad:
 
 min_chunk = args.min_chunk_size
 online = OnlineASRProcessor(asr,create_tokenizer(tgt_language),logfile=args.logfile)
+
+if args.buffer_trimming == "sentence":
+    tokenizer = create_tokenizer(tgt_language)
+else:
+    tokenizer = None
+online = OnlineASRProcessor(asr,tokenizer,buffer_trimming=(args.buffer_trimming, args.buffer_trimming_sec))
 
 
 
