@@ -11,7 +11,10 @@ export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.pem
 VAD from https://github.com/rodrigoGA/whisper_streaming
 # Specify the model dir and lang
 ./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.5 --model_dir=/data/s2t/whisper/models/small --model small --language xx
-
+./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/small_ft_en_wipo_1 --model small --language en 
+./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language zh
+For ZH ./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.1 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language xx 
+For JA /whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language xx
 
 # for azsrv2
 

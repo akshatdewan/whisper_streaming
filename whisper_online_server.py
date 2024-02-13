@@ -5,6 +5,7 @@ import sys
 import argparse
 import os
 from voice_activity_controller import VoiceActivityController
+import opencc
 
 parser = argparse.ArgumentParser()
 
@@ -25,7 +26,6 @@ parser.add_argument('--task', type=str, default='transcribe', choices=["transcri
 parser.add_argument('--backend', type=str, default="faster-whisper", choices=["faster-whisper", "whisper_timestamped"],help='Load only this backend for Whisper processing.')
 parser.add_argument('--vad', action="store_true", default=False, help='Use VAD = voice activity detection, with the default parameters.')
 parser.add_argument('--logfile', type=argparse.FileType('w',encoding='utf-8',errors='strict'), default=sys.stderr, help='Log file')
-add_shared_args(parser)
 args = parser.parse_args()
 
 
@@ -36,6 +36,8 @@ SAMPLING_RATE = 16000
 size = args.model
 language = args.lan
 logfile = args.logfile
+
+converter = opencc.OpenCC('t2s.json')
 
 t = time.time()
 print(f"Loading Whisper {size} model for {language}...",file=sys.stdout,end=" ",flush=True)
@@ -73,21 +75,31 @@ if args.vad:
 min_chunk = args.min_chunk_size
 online = OnlineASRProcessor(asr,create_tokenizer(tgt_language),logfile=args.logfile)
 
-if args.buffer_trimming == "sentence":
-    tokenizer = create_tokenizer(tgt_language)
-else:
-    tokenizer = None
-online = OnlineASRProcessor(asr,tokenizer,buffer_trimming=(args.buffer_trimming, args.buffer_trimming_sec))
+#if args.buffer_trimming == "sentence":
+#    tokenizer = create_tokenizer(tgt_language)
+#else:
+#    tokenizer = None
+#online = OnlineASRProcessor(asr,tokenizer,buffer_trimming=(args.buffer_trimming, args.buffer_trimming_sec))
 
 
 
-demo_audio_path = "cs-maji-2.16k.wav"
-if os.path.exists(demo_audio_path):
+#demo_audio_path = "cs-maji-2.16k.wav"
+zh_audio_path="GC62_china_35s_from_100.mp4"
+en_audio_path="IPDAY_21_2021-04-13_AM_1_en_30-45.wav"
+fr_audio_path="fr-test_covid_30-45.wav"
+if os.path.exists(zh_audio_path) and tgt_language == "zh":
     # load the audio into the LRU cache before we start the timer
-    a = load_audio_chunk(demo_audio_path,0,1)
+    a = load_audio_chunk(zh_audio_path,0,1)
 
     # TODO: it should be tested whether it's meaningful
     # warm up the ASR, because the very first transcribe takes much more time than the other
+    #asr.transcribe(a,init_prompt="这是中国代表团的发言。以下是普通话的句子。请用简体字写。")
+    asr.transcribe(a,init_prompt="关于简体/繁体的区分，我们对所有中文变体使用单一的语言代码。")
+elif os.path.exists(en_audio_path) and tgt_language == "en":
+    a = load_audio_chunk(en_audio_path,0,1)
+    asr.transcribe(a)
+elif os.path.exists(fr_audio_path) and tgt_language == "fr":
+    a = load_audio_chunk(fr_audio_path,0,1)
     asr.transcribe(a)
 else:
     print("Whisper is not warmed up",file=sys.stdout)
@@ -172,7 +184,7 @@ class ServerProcessor:
         # succeeding [beg,end] intervals are not overlapping because ELITR protocol (implemented in online-text-flow events) requires it.
         # Therefore, beg, is max of previous end and current beg outputed by Whisper.
         # Usually it differs negligibly, by appx 20 ms.
-
+        
         if o[0] is not None:
             beg, end = o[0]*1000,o[1]*1000
             if self.last_end is not None:
@@ -181,9 +193,15 @@ class ServerProcessor:
             self.last_end = end
             #TODO
             #print("%1.0f %1.0f %s" % (beg,end,o[2]),flush=True,file=sys.stdout)
-            sys.stdout.write(" {}".format(o[2].strip()))
+            op = o[2].strip().replace("整理&字幕 :三马兄","").replace("整理&字幕 :\"三马兄\"","").replace("整理&字幕:三马兄","").replace("整理&字幕):三马兄","")
+            op = converter.convert(op)
+
+            ### DTR
+            op=op.replace(".", ".\n").replace("?", "?\n")
+
+            sys.stdout.write(" {}".format(op))
             sys.stdout.flush()
-            return "%1.0f %1.0f %s" % (beg,end,o[2])
+            return "%1.0f %1.0f %s" % (beg,end,op)
         else:
             #print(o,file=sys.stdout,flush=True)
             return None
