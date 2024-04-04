@@ -26,6 +26,7 @@ parser.add_argument('--task', type=str, default='transcribe', choices=["transcri
 parser.add_argument('--backend', type=str, default="faster-whisper", choices=["faster-whisper", "whisper_timestamped"],help='Load only this backend for Whisper processing.')
 parser.add_argument('--vad', action="store_true", default=False, help='Use VAD = voice activity detection, with the default parameters.')
 parser.add_argument('--logfile', type=argparse.FileType('w',encoding='utf-8',errors='strict'), default=sys.stderr, help='Log file')
+parser.add_argument('--outfile', type=argparse.FileType('w',encoding='utf-8',errors='strict'), default=sys.stderr, help='Output file')
 args = parser.parse_args()
 
 
@@ -36,6 +37,7 @@ SAMPLING_RATE = 16000
 size = args.model
 language = args.lan
 logfile = args.logfile
+outfile = args.outfile
 
 converter = opencc.OpenCC('t2s.json')
 
@@ -198,7 +200,8 @@ class ServerProcessor:
 
             ### DTR
             op=op.replace(".", ".\n").replace("?", "?\n")
-
+            
+            print(op,file=outfile,flush=True,end=' ')
             sys.stdout.write(" {}".format(op))
             sys.stdout.flush()
             return "%1.0f %1.0f %s" % (beg,end,op)

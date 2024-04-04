@@ -11,21 +11,28 @@ export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.pem
 VAD from https://github.com/rodrigoGA/whisper_streaming
 # Specify the model dir and lang
 ./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.5 --model_dir=/data/s2t/whisper/models/small --model small --language xx
-./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/small_ft_en_wipo_1 --model small --language en 
-./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language zh
-For ZH ./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.1 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language xx 
-For JA /whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language xx
+./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/small_ft_en_wipo_1 --model small --language en
+# We still can not use the large model
+#./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language zh
+#For ZH ./whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.1 --model_dir=/data/s2t/whisper/models/large-v2 --model large --language xx
+#For JA. However, we introduced an issue while forcing all traditional ZH characters to simplified
+ /whisper_online_server.py --logfile=server_log.txt --min-chunk-size=0.01 --model_dir=/data/s2t/whisper/models/large-v2 --model small --language xx
 
-# for azsrv2
-
+## for azsrv2
 docker run --name live_cap --net host -u 0:0 -d -it --rm --gpus all -v /data/s2t/:/data/s2t -v /datatraining/s2t:/datatraining/s2t --device /dev/snd:/dev/snd  registry.wipo.int/atac/s2t/streaming_whisper:v1.2 bash
-docekr exec -it live_cap bash
+# the Gstreamer image is not required but can be used as below
+#docker run -it -d --name livecap.client --net host -u 0:0 -v /data/smt:/data/smt -v /data/s2t:/data/s2t -v /databig/s2t:/databig/s2t --device /dev/snd:/dev/snd gstreamer:20210222.ovh bash
+docker exec -it live_cap bash
 cd /data/s2t/speech_tools/whisper_streaming
-/whisper_streaming/venv/bin/python ./whisper_online_server.py --model_dir=/data/s2t/whisper/models/small --model small --lang en --logfile log.txt
+/whisper_streaming/venv/bin/python ./whisper_online_server.py --model_dir=/data/s2t/whisper/models/small --model small --lang en --logfile log.txt --min-chunk-size=0.5
 #Be careful when setting the device param in the command below. aplay -l gives a lot of information. There are many audio cards that are shown by aplay but we are concerned with USB cards only.
+# arecord -l can also be used to find the card ids
 #if need be
+docker exec -it -u smtadmin:smtadmin live_cap bash
 pulseaudio --start
+exit
+docker exec -it live_cap bash
 gst-launch-1.0  alsasrc device=hw:0,0 !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=teslaazsrv2.wipo.int port=43007 blocksize=320000
 gst-launch-1.0  alsasrc device=hw:2,0 !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=teslaazsrv2.wipo.int port=43007 blocksize=320000
-
-
+gst-launch-1.0  alsasrc device=hw:9,0 !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=localhost port=43007 blocksize=320000
+gst-launch-1.0  alsasrc device=hw:8,0 !  decodebin! audioresample! audioconvert! audio/x-raw,channels=1,rate=16000,format=S16LE ! wavenc ! tcpclientsink host=localhost port=43007 blocksize=320000
